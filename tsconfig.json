@@ -15,8 +15,7 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "target": "es2022",
-    "customConditions": ["@nrz/source"],
-    "rewriteRelativeImportExtensions": true
-  }
+    "target": "es2022"
+  },
+  "exclude": ["dist"]
 }

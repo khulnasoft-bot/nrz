@@ -1,5 +1,5 @@
 import t from 'tap'
-import { deleteHeader } from '../src/delete-header.ts'
+import { deleteHeader } from '../src/delete-header.js'
 
 const k = 'key'
 const v = 'value'
@@ -40,6 +40,35 @@ t.strictSame(
       yield ['x', 'y']
       yield [k, v]
     })(),
+    k,
+  ),
+  [['x', 'y']],
+)
+
+// any casing, every match
+t.strictSame(
+  deleteHeader({ Authorization: 'a', authorization: 'b', x: 'y' }, k),
+  { Authorization: 'a', authorization: 'b', x: 'y' },
+)
+t.strictSame(
+  deleteHeader(
+    { Authorization: 'a', authorization: 'b', x: 'y' },
+    'authorization',
+  ),
+  { x: 'y' },
+)
+t.strictSame(deleteHeader([k, v, 'x', 'y', 'KEY', v, k, v], k), [
+  'x',
+  'y',
+])
+t.strictSame(
+  deleteHeader(
+    [
+      [k, v],
+      ['x', 'y'],
+      ['Key', v],
+      [k, v],
+    ],
     k,
   ),
   [['x', 'y']],

@@ -1,14 +1,14 @@
-import {
-  promiseSpawn,
-  type SpawnResultStderrString,
-  type SpawnResultStdoutString,
+import { promiseSpawn } from '@nrz/promise-spawn'
+import type {
+  SpawnResultStderrString,
+  SpawnResultStdoutString,
 } from '@nrz/promise-spawn'
 import promiseRetry from 'promise-retry'
-import { type WrapOptions } from 'retry'
-import { type GitOptions } from './index.ts'
-import { makeError } from './make-error.ts'
-import { opts as makeOpts } from './opts.ts'
-import { which } from './which.ts'
+import type { WrapOptions } from 'retry'
+import type { GitOptions } from './index.js'
+import { makeError } from './make-error.js'
+import { opts as makeOpts } from './opts.js'
+import { which } from './which.js'
 
 export const spawn = async (
   gitArgs: string[],
@@ -39,8 +39,8 @@ export const spawn = async (
   return promiseRetry(async (retryFn, num) => {
     const result = await promiseSpawn(gitPath, args, makeOpts(opts))
     if (result.status || result.signal) {
-      const gitError = makeError(result)
-      if (!gitError.shouldRetry(num)) {
+      const [shouldRetry, gitError] = makeError(result)
+      if (!shouldRetry?.(num)) {
         throw gitError
       }
       retryFn(gitError)

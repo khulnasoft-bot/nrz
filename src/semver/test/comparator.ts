@@ -1,8 +1,8 @@
 import t from 'tap'
-import { Comparator } from '../src/comparator.ts'
+import { Comparator } from '../src/comparator.js'
 
 // version tests cover most of the comparator code paths
-import { Version } from '../src/version.ts'
+import { Version } from '../src/version.js'
 import './range.ts'
 import './version.ts'
 
@@ -150,5 +150,16 @@ t.test('any and none are singletons', t => {
     }
     t.end()
   })
+  t.end()
+})
+
+t.test('dotted prerelease and build kept intact', t => {
+  for (const [c, s] of [
+    ['>=1.2.3-beta.1', '>=1.2.3-beta.1'],
+    ['1.2.3-a.b.c+d.e', '1.2.3-a.b.c+d.e'],
+    ['~1.2.3-rc.1.2', '>=1.2.3-rc.1.2 <1.3.0-0'],
+  ] as const) {
+    t.equal(new Comparator(c).toString(), s, c)
+  }
   t.end()
 })

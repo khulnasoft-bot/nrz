@@ -1,118 +1,77 @@
-import { splitDepID } from '@nrz/dep-id/browser'
 import { error } from '@nrz/error-cause'
-import { type EdgeLike, type NodeLike } from '@nrz/graph'
-import { asManifest } from '@nrz/types'
+import { removeDanglingEdges, removeNode } from './pseudo/helpers.js'
+import { didYouMean, queryError, selectorText } from './error.js'
 import {
-  attributeSelectorsMap,
-  filterAttributes,
-} from './attribute.ts'
-import {
-  asAttributeNode,
   asPostcssNodeWithChildren,
   asPseudoNode,
-  asTagNode,
   isSelectorNode,
-  type ParserFn,
-  type ParserState,
-  type PostcssNode,
-} from './types.ts'
+} from '@nrz/dss-parser'
 
-export type AttrInternals = {
-  attribute: string
-  insensitive: boolean
-  operator?: string
-  value?: string
-  properties: string[]
-}
+// imported pseudo selectors
+import { abandoned } from './pseudo/abandoned.js'
+import { attr } from './pseudo/attr.js'
+import { built } from './pseudo/built.js'
+import { confused } from './pseudo/confused.js'
+import { cve } from './pseudo/cve.js'
+import { cwe } from './pseudo/cwe.js'
+import { debug } from './pseudo/debug.js'
+import { deprecated } from './pseudo/deprecated.js'
+import { dev } from './pseudo/dev.js'
+import { diff } from './pseudo/diff.js'
+import { dist } from './pseudo/dist.js'
+import { dynamic } from './pseudo/dynamic.js'
+import { empty } from './pseudo/empty.js'
+import { entropic } from './pseudo/entropic.js'
+import { env } from './pseudo/env.js'
+import { evalParser } from './pseudo/eval.js'
+import { fs } from './pseudo/fs.js'
+import { hostContext } from './pseudo/host.js'
+import { hostname } from './pseudo/hostname.js'
+import { license } from './pseudo/license.js'
+import { link } from './pseudo/link.js'
+import { malware } from './pseudo/malware.js'
+import { minified } from './pseudo/minified.js'
+import { missing } from './pseudo/missing.js'
+import { nativeParser } from './pseudo/native.js'
+import { network } from './pseudo/network.js'
+import { obfuscated } from './pseudo/obfuscated.js'
+import { optional } from './pseudo/optional.js'
+import { outdated } from './pseudo/outdated.js'
+import { overridden } from './pseudo/overridden.js'
+import { path } from './pseudo/path.js'
+import { peer } from './pseudo/peer.js'
+import { prerelease } from './pseudo/prerelease.js'
+import { published } from './pseudo/published.js'
+import { privateParser } from './pseudo/private.js'
+import { registry } from './pseudo/registry.js'
+import { prod } from './pseudo/prod.js'
+import { root } from './pseudo/root.js'
+import { scanned } from './pseudo/scanned.js'
+import { score } from './pseudo/score.js'
+import { scripts } from './pseudo/scripts.js'
+import { shell } from './pseudo/shell.js'
+import { semverParser as semver } from './pseudo/semver.js'
+import { severity } from './pseudo/severity.js'
+import { spec } from './pseudo/spec.js'
+import { shrinkwrap } from './pseudo/shrinkwrap.js'
+import { skill } from './pseudo/skill.js'
+import { skills } from './pseudo/skills.js'
+import { squat } from './pseudo/squat.js'
+import { suspicious } from './pseudo/suspicious.js'
+import { tracker } from './pseudo/tracker.js'
+import { trivial } from './pseudo/trivial.js'
+import { type } from './pseudo/type.js'
+import { undesirable } from './pseudo/undesirable.js'
+import { unknown } from './pseudo/unknown.js'
+import { unmaintained } from './pseudo/unmaintained.js'
+import { unpopular } from './pseudo/unpopular.js'
+import { unstable } from './pseudo/unstable.js'
+import { vuln } from './pseudo/vuln.js'
+import { workspace } from './pseudo/workspace.js'
 
-const removeNode = (state: ParserState, node: NodeLike) => {
-  for (const edge of node.edgesIn) {
-    state.partial.edges.delete(edge)
-  }
-  state.partial.nodes.delete(node)
-}
-
-const removeDanglingEdges = (state: ParserState) => {
-  for (const edge of state.partial.edges) {
-    if (!edge.to) {
-      state.partial.edges.delete(edge)
-    }
-  }
-}
-
-/**
- * Parses the internal / nested selectors of a `:attr` selector.
- */
-const parseAttrInternals = (nodes: PostcssNode[]): AttrInternals => {
-  // the last part is the attribute selector
-  const attributeSelector = asAttributeNode(
-    asPostcssNodeWithChildren(nodes.pop()).nodes[0],
-  )
-  // all preppending selectors are naming nested properties
-  const properties: string[] = []
-  for (const selector of nodes) {
-    properties.push(
-      asTagNode(asPostcssNodeWithChildren(selector).nodes[0]).value,
-    )
-  }
-  // include the attribute selector as the last part of the property lookup
-  properties.push(attributeSelector.attribute)
-
-  return {
-    attribute: attributeSelector.attribute,
-    insensitive: attributeSelector.insensitive || false,
-    operator: attributeSelector.operator,
-    value: attributeSelector.value,
-    properties,
-  }
-}
-
-/**
- * :attr Pseudo-Selector, allows for retrieving nodes based on nested
- * properties of the `package.json` metadata.
- */
-const attr = async (state: ParserState) => {
-  // Parses and retrieves the values for the nested selectors
-  let internals
-  try {
-    internals = parseAttrInternals(
-      asPostcssNodeWithChildren(state.current).nodes,
-    )
-  } catch (err) {
-    throw error('Failed to parse :attr selector', {
-      cause: err,
-    })
-  }
-
-  // reuses the attribute selector logic to filter the nodes
-  const comparator =
-    internals.operator ?
-      attributeSelectorsMap.get(internals.operator)
-    : undefined
-  const value = internals.value || ''
-  const propertyName = internals.attribute
-  const insensitive = internals.insensitive
-  const prefixProperties = internals.properties
-  return filterAttributes(
-    state,
-    comparator,
-    value,
-    propertyName,
-    insensitive,
-    prefixProperties,
-  )
-}
-/**
- * :empty Pseudo-Selector, matches only nodes that have no children.
- */
-const empty = async (state: ParserState) => {
-  for (const node of state.partial.nodes) {
-    if (node.edgesOut.size > 0) {
-      removeNode(state, node)
-    }
-  }
-  return state
-}
+import type { PseudoClassName } from '@nrz/dss-parser'
+import type { EdgeLike, NodeLike } from '@nrz/types'
+import type { ParserFn, ParserState } from './types.js'
 
 /**
  * :has Pseudo-Selector, matches only nodes that have valid results
@@ -141,6 +100,17 @@ const has = async (state: ParserState) => {
           edges: new Set(state.partial.edges),
           nodes: new Set(state.partial.nodes),
         },
+        diffFiles: state.diffFiles,
+        hasSkills: state.hasSkills,
+        loose: state.loose,
+        hostContexts: state.hostContexts,
+        importers: state.importers,
+        retries: state.retries,
+        securityArchive: state.securityArchive,
+        signal: state.signal,
+        scopeIDs: state.scopeIDs,
+        comment: state.comment,
+        specificity: { ...state.specificity },
       })
       for (const n of nestedState.collect.nodes) {
         collectNodes.add(n)
@@ -214,13 +184,23 @@ const is = async (state: ParserState) => {
           nodes: new Set(),
         },
         current: node,
+        diffFiles: state.diffFiles,
+        hasSkills: state.hasSkills,
         initial: state.initial,
         loose: true,
         partial: {
           nodes: new Set(state.partial.nodes),
           edges: new Set(state.partial.edges),
         },
+        importers: state.importers,
+        hostContexts: state.hostContexts,
         walk: state.walk,
+        retries: state.retries,
+        securityArchive: state.securityArchive,
+        signal: state.signal,
+        scopeIDs: state.scopeIDs,
+        comment: state.comment,
+        specificity: { ...state.specificity },
       })
       for (const n of nestedState.collect.nodes) {
         collect.add(n)
@@ -232,20 +212,6 @@ const is = async (state: ParserState) => {
       removeNode(state, node)
     }
   }
-  return state
-}
-
-/**
- * :missing Pseudo-Selector, matches only
- * edges that are not linked to any node.
- */
-const missing = async (state: ParserState) => {
-  for (const edge of state.partial.edges) {
-    if (edge.to) {
-      state.partial.edges.delete(edge)
-    }
-  }
-  state.partial.nodes.clear()
   return state
 }
 
@@ -266,12 +232,23 @@ const not = async (state: ParserState) => {
           nodes: new Set(),
         },
         current: node,
+        diffFiles: state.diffFiles,
+        hasSkills: state.hasSkills,
         initial: state.initial,
+        loose: state.loose,
         partial: {
           nodes: new Set(state.partial.nodes),
           edges: new Set(state.partial.edges),
         },
+        importers: state.importers,
+        hostContexts: state.hostContexts,
         walk: state.walk,
+        retries: state.retries,
+        securityArchive: state.securityArchive,
+        signal: state.signal,
+        scopeIDs: state.scopeIDs,
+        comment: state.comment,
+        specificity: { ...state.specificity },
       })
       for (const n of nestedState.collect.nodes) {
         collect.add(n)
@@ -290,16 +267,39 @@ const not = async (state: ParserState) => {
       removeNode(state, node)
     }
   }
+
+  removeDanglingEdges(state)
+
   return state
 }
 
 /**
- * :private Pseudo-Selector will only match packages that have
- * a `private: true` key set in their `package.json` metadata.
+ * :project Pseudo-Class, matches only graph importers (e.g: the
+ * root node along with any configured workspace)
  */
-const privateFn = async (state: ParserState) => {
+const project = async (state: ParserState) => {
   for (const node of state.partial.nodes) {
-    if (!node.manifest || !asManifest(node.manifest).private) {
+    if (!node.importer) {
+      removeNode(state, node)
+    }
+  }
+  for (const edge of state.partial.edges) {
+    if (!edge.to?.importer) {
+      state.partial.edges.delete(edge)
+    }
+  }
+  return state
+}
+
+/**
+ * :scope Pseudo-Element, returns only the nodes that match the provided scopeIDs
+ * from the Query.search method.
+ */
+const scope = async (state: ParserState) => {
+  const scopeIDSet = new Set(state.scopeIDs)
+
+  for (const node of state.partial.nodes) {
+    if (!scopeIDSet.has(node.id)) {
       removeNode(state, node)
     }
   }
@@ -309,109 +309,84 @@ const privateFn = async (state: ParserState) => {
   return state
 }
 
-/**
- * :root Pseudo-Element will return the project root node for the graph.
- */
-const root = async (state: ParserState) => {
-  const [anyNode] = state.initial.nodes.values()
-  const mainImporter = anyNode?.graph.mainImporter
-  if (!mainImporter) {
-    throw error(':root pseudo-element works on local graphs only')
-  }
-  for (const edge of state.partial.edges) {
-    if (edge.to !== mainImporter) {
-      state.partial.edges.delete(edge)
-    }
-  }
-  state.partial.nodes.clear()
-  state.partial.nodes.add(mainImporter)
-  return state
-}
-
-/**
- * :project Pseudo-Element, returns all graph importers (e.g: the
- * root node along with any configured workspace)
- */
-const project = async (state: ParserState) => {
-  const [anyNode] = state.initial.nodes.values()
-  const importers = anyNode?.graph.importers
-  if (!importers?.size) {
-    throw error(':project pseudo-element works on local graphs only')
-  }
-
-  // make a list of all edges that are coming from importers
-  // so that we can filter out any edges that are not direct
-  // dependencies of the importers
-  const importersEdgesIn = new Set<EdgeLike>()
-  for (const importer of importers) {
-    for (const edge of importer.edgesIn) {
-      importersEdgesIn.add(edge)
-    }
-  }
-
-  for (const edge of state.partial.edges) {
-    if (!edge.to || !importersEdgesIn.has(edge)) {
-      state.partial.edges.delete(edge)
-    }
-  }
-  state.partial.nodes.clear()
-  for (const importer of importers) {
-    state.partial.nodes.add(importer)
-  }
-  return state
-}
-
-/**
- * :scope Pseudo-Element, returns the original scope of items
- * at the start of a given selector.
- */
-const scope = async (state: ParserState) => {
-  state.partial.edges.clear()
-  state.partial.nodes.clear()
-  for (const edge of state.initial.edges) {
-    state.partial.edges.add(edge)
-  }
-  for (const node of state.initial.nodes) {
-    state.partial.nodes.add(node)
-  }
-  return state
-}
-
-/**
- * :type(str) Pseudo-Element will match only nodes that are of
- * the same type as the value used
- */
-const typeFn = async (state: ParserState) => {
-  const type = asPostcssNodeWithChildren(state.current)
-  const selector = asPostcssNodeWithChildren(type.nodes[0])
-  const name = asTagNode(selector.nodes[0]).value
-  for (const node of state.partial.nodes) {
-    const nodeType = splitDepID(node.id)[0]
-    if (nodeType !== name) {
-      removeNode(state, node)
-    }
-  }
-  return state
-}
-
 const pseudoSelectors = new Map<string, ParserFn>(
   Object.entries({
+    abandoned,
     attr,
+    built,
+    confused,
+    cve,
+    cwe,
+    debug,
+    deprecated,
+    dev,
+    diff,
+    dist,
+    dynamic,
+    eval: evalParser,
     empty,
+    entropic,
+    env,
+    fs,
     has,
+    host: hostContext,
+    hostname,
     is,
-    // TODO: link
+    license,
+    link,
+    malware,
+    minified,
     missing,
+    native: nativeParser,
+    network,
     not,
-    // TODO: overridden
-    private: privateFn,
+    obfuscated,
+    optional,
+    outdated,
+    overridden,
+    path,
+    peer,
+    prerelease,
+    published,
+    private: privateParser,
+    prod,
+    registry,
     project,
     root,
+    scanned,
     scope,
-    type: typeFn,
-    // TODO: semver
-    // TODO: outdated
-  }),
+    score,
+    scripts,
+    semver,
+    sev: severity,
+    spec,
+    severity,
+    shell,
+    shrinkwrap,
+    skill,
+    skills,
+    squat,
+    suspicious,
+    tracker,
+    trivial,
+    type,
+    undesirable,
+    unknown,
+    unmaintained,
+    unpopular,
+    unstable,
+    v: semver,
+    vuln,
+    vulnerable: vuln,
+    workspace,
+  } satisfies Record<PseudoClassName, ParserFn>),
+)
+
+/**
+ * Names of every supported pseudo-class, without the leading `:`.
+ */
+export const pseudoSelectorNames: ReadonlySet<string> = new Set(
+  pseudoSelectors.keys(),
 )
 
 /**
@@ -426,12 +401,40 @@ export const pseudo = async (state: ParserState) => {
 
   if (!parserFn) {
     if (state.loose) {
+      state.partial.edges.clear()
+      state.partial.nodes.clear()
       return state
     }
 
-    throw new Error(
+    // `:difff(x)` should still suggest `:diff`, so drop any arguments
+    const name = selectorText(state.current)
+      .replace(/^:/, '')
+      .replace(/\(.*$/s, '')
+    const suggestions = didYouMean(name, pseudoSelectorNames).map(
+      n => `:${n}`,
+    )
+    throw queryError(
       `Unsupported pseudo-class: ${state.current.value}`,
+      state.current,
+      suggestions.length > 1 ?
+        { validOptions: suggestions }
+      : { wanted: suggestions[0] },
     )
   }
-  return parserFn(state)
+
+  const result = await parserFn(state)
+
+  // Increment the commonCounter for specificity, except for
+  // nesting selectors which don't contribute to specificity
+  const pseudoValue = curr.value.slice(1)
+  if (
+    pseudoValue &&
+    pseudoValue !== 'not' &&
+    pseudoValue !== 'is' &&
+    pseudoValue !== 'has'
+  ) {
+    result.specificity.commonCounter += 1
+  }
+
+  return result
 }

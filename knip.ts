@@ -1,0 +1,61 @@
+import type { KnipConfig } from 'knip'
+import { getWorkspaces } from './scripts/utils.ts'
+import { relative } from 'node:path'
+
+const entry = [
+  'src/index.{ts,js,tsx}',
+  'src/bins/**/*.{ts,js}',
+  'test/**/*.ts',
+  'scripts/**/*.{ts,js}',
+  'benchmarks/**/*.{ts,js}',
+]
+
+const workspaces = {
+  '.': {
+    entry,
+    // Used to download fixtures in a bash script
+    ignoreDependencies: [
+      '@nrz/benchmark',
+      'eslint-import-resolver-typescript',
+      'eslint-plugin-import',
+      'eslint-plugin-jsdoc',
+      'globals',
+    ],
+    ignore: ['coverage-map.js', 'eslint.config.mjs'],
+  },
+  'src/cli-sdk': {
+    entry: [...entry, 'src/commands/*.ts'],
+    // posthog-node is loaded via createRequire (dynamic require)
+    // which knip cannot statically detect
+    ignoreDependencies: ['posthog-node'],
+  },
+  'infra/build': { entry },
+}
+
+export default {
+  // Exclude exports and types because they have false positives
+  // from tap.mockImport. Run with `knip --include exports,types` to
+  // include them.
+  exclude: ['exports', 'types'],
+  // These dependencies make it possible to run linting and typedoc
+  // from each individual workspaces but that capability to not
+  // exercised anywhere yet.
+  ignoreDependencies: ['@eslint/js', 'typescript-eslint', 'typedoc'],
+  ignore: [
+    '**/tap-snapshots/**/*.cjs',
+    './infra/cli-benchmarks/fixtures/**',
+    './www/**',
+  ],
+  ignoreBinaries: ['hyperfine', 'xvn', 'sleep', 'tap'],
+  eslint: false,
+  workspaces: Object.fromEntries(
+    getWorkspaces().map(ws => {
+      const key = relative(process.cwd(), ws.dir) || '.'
+      const workspaceConfig = workspaces as Record<
+        string,
+        (typeof workspaces)[keyof typeof workspaces]
+      >
+      return [key, workspaceConfig[key] ?? { entry }]
+    }),
+  ),
+} satisfies KnipConfig

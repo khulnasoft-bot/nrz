@@ -1,14 +1,24 @@
 import { longDependencyTypes } from '@nrz/types'
-import { asDependencyTypeShort, shorten } from './dependencies.ts'
-import { getBooleanFlagsFromNum } from './lockfile/types.ts'
-import { stringifyNode } from './stringify-node.ts'
-import { loadEdges } from './lockfile/load-edges.ts'
-import { loadNodes } from './lockfile/load-nodes.ts'
-export * from './types.ts'
+import { asDependencyTypeShort, shorten } from './dependencies.js'
+import { getBooleanFlagsFromNum } from './lockfile/types.js'
+import { stringifyNode } from './stringify-node.js'
+import { loadEdges } from './lockfile/load-edges.js'
+import { loadNodes } from './lockfile/load-nodes.js'
+import { load } from './transfer-data/load.js'
+export type {
+  LoadResult,
+  TransferData,
+} from './transfer-data/load.js'
+
+export * from './virtual-root.js'
 
 const lockfile = {
   loadEdges,
   loadNodes,
+}
+
+const transfer = {
+  load,
 }
 
 export {
@@ -18,4 +28,5 @@ export {
   longDependencyTypes,
   shorten,
   stringifyNode,
+  transfer,
 }
